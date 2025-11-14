@@ -1,0 +1,2 @@
+### Fixed
+- TitanPanelChildButtonTemplate errors

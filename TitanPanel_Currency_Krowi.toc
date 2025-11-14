@@ -1,0 +1,13 @@
+## Interface: 110205
+## Title: |cFF1D92C2Titan Panel [Currency]|r - Krowi's
+## X-Prefix: KrowiTPC
+## X-Acronym: KTPC
+## Version: 1.0
+## Author: Krowi-Frostmane EU (former: Greenhorns@Vek'Nilash)
+## Notes: This mod will display all the Currency you have on the current toon in a tool tip.  It shows the current Toons Gold amount on the Titan Panel bar.
+## RequiredDeps: Titan
+## DefaultState: Enabled
+## LoadOnDemand: 0
+
+locale\locale-enUS.lua
+TitanPanel_Currency_Krowi.xml
