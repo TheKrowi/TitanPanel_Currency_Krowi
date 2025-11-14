@@ -8,6 +8,8 @@
 ## RequiredDeps: Titan
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
+## X-CurseForge: https://www.curseforge.com/wow/addons/titan-panel-currency-krowis
+## X-Curse-Project-ID: 1384482
 
 locale\locale-enUS.lua
 TitanPanel_Currency_Krowi.xml
