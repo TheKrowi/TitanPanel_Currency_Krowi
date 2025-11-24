@@ -1,4 +1,4 @@
-<p><h3>Fixed</h3></p>
+<p><h3>Change</h3></p>
 <ul>
-<li>TitanPanelChildButtonTemplate errors</li>
+<li>Total rewrite with improved functionality</li>
 </ul>

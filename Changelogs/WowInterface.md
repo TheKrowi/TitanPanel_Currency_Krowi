@@ -1,4 +1,4 @@
-[B]Fixed[/B]
+[B]Change[/B]
 [LIST]
-[*]TitanPanelChildButtonTemplate errors
+[*]Total rewrite with improved functionality
 [/LIST]

@@ -54,7 +54,17 @@
         "UIDropDownMenu_AddButton",
         "C_CurrencyInfo",
         "strconcat",
-        "MenuResponse"
+        "MenuResponse",
+        "IsShiftKeyDown",
+        "UnitName",
+        "GetRealmName",
+        "UnitFactionGroup",
+        "RAID_CLASS_COLORS",
+        "UnitClass",
+        "time",
+        "UnitLevel",
+        "C_Bank",
+        "Enum"
     ],
     "Lua.diagnostics.disable": [
         "deprecated",

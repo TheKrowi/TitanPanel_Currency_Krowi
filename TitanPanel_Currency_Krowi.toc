@@ -4,6 +4,7 @@
 ## X-Acronym: KTPC
 ## Version: 2.0
 ## Author: Krowi-Frostmane EU
+## SavedVariables: KrowiTPC_Options
 ## Notes: Displays all in-game currencies for your current character in a tooltip, including gold shown on the Titan Panel bar.
 ## RequiredDeps: Titan
 ## DefaultState: Enabled
@@ -15,4 +16,7 @@ Libs\Files.xml
 
 Localization\Files.xml
 
+Currency.lua
+Tooltip.lua
+Menu.lua
 TitanPanel_Currency_Krowi.lua

@@ -1,2 +1,2 @@
-### Fixed
-- TitanPanelChildButtonTemplate errors
+### Change
+- Total rewrite with improved functionality
