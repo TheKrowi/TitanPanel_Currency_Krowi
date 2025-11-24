@@ -1,5 +1,7 @@
 ﻿local addonName, addon = ...;
 
+KrowiTPC = {};
+
 addon.L = LibStub(addon.Libs.AceLocale):GetLocale(addonName);
 local titan = {};
 titan.L = LibStub("AceLocale-3.0"):GetLocale("Titan", true);
@@ -15,30 +17,6 @@ local function AbbreviateValue(value, abbreviateK, abbreviateM)
 	return value, "";
 end
 
-local function GetNextCurrency(currencies, startIndex)
-	local size = C_CurrencyInfo.GetCurrencyListSize();
-	for i = startIndex, size do
-		local info = C_CurrencyInfo.GetCurrencyListInfo(i);
-		if info.isHeader then
-			if not info.isHeaderExpanded then
-				C_CurrencyInfo.ExpandCurrencyList(i, true);
-				return false, i + 1;
-			end
-		else
-			tinsert(currencies, info);
-		end
-	end
-	return true, size + 1;
-end
-
-local function GetAllCurrencies()
-	local currencies, finished, nextIndex = {}, false, 1;
-	while not finished do
-		finished, nextIndex = GetNextCurrency(currencies, nextIndex);
-	end
-	return currencies;
-end
-
 local function GetSeparators()
 	if (TitanGetVar(id, "ThousandsSeparator") == addon.L["Space"]) then
 		return " ", ".";
@@ -50,21 +28,244 @@ local function GetSeparators()
 	return "", "";
 end
 
-local function GetAllCurrenciesSorted()
-	local currencies = GetAllCurrencies();
-	local abbreviateK, abbreviateM = TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1k"], TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1m"];
-	local thousandsSeparator, decimalSeparator = GetSeparators();
+do
+	local headerStack = {}; -- Stack to track nested headers
+	local headerOrder = {}; -- Track the order of top-level headers
+	local function GetNextCurrencyWithHeader(currencies, startIndex)
+		local size = C_CurrencyInfo.GetCurrencyListSize();
+		for i = startIndex, size do
+			local info = C_CurrencyInfo.GetCurrencyListInfo(i);
+			if info.isHeader then
+				-- Maintain a stack of headers based on depth
+				local depth = info.currencyListDepth;
 
-	table.sort(currencies, function(a, b) return a.name < b.name end);
+				-- Trim stack to current depth (remove deeper levels when going back up)
+				while #headerStack > depth do
+					table.remove(headerStack);
+				end
 
-	local line, tooltip = "", "";
-	for _, currency in next, currencies do
-		local quantity, abbr = AbbreviateValue(currency.quantity, abbreviateK, abbreviateM);
-		quantity = TitanUtils_NumToString(quantity, thousandsSeparator, decimalSeparator);
-		line = currency.name .. "\t" .. quantity .. abbr .. " |T" .. currency.iconFileID .. ":16|t"
-		tooltip = strconcat(tooltip, line, "|r\n");
+				-- Create header entry with metadata
+				local headerEntry = {
+					name = info.name,
+					depth = depth,
+					children = {},
+					currencies = {}
+				};
+
+				if depth == 0 then
+					-- Top-level header - track its order
+					currencies[info.name] = headerEntry;
+					tinsert(headerOrder, info.name);
+					headerStack = {headerEntry};
+				else
+					-- Nested header - add to parent's children
+					if headerStack[depth] then
+						headerStack[depth].children[info.name] = headerEntry;
+					end
+					-- Add to stack at current depth
+					headerStack[depth + 1] = headerEntry;
+				end
+
+				if not info.isHeaderExpanded then
+					C_CurrencyInfo.ExpandCurrencyList(i, true);
+					return false, i + 1;
+				end
+			elseif #headerStack > 0 and not (TitanGetVar(id, "CurrencyHideUnused") and info.isTypeUnused) then
+				-- Add currency to the deepest current header
+				local currentHeader = headerStack[#headerStack];
+				if currentHeader then
+					tinsert(currentHeader.currencies, info);
+				end
+			end
+		end
+		return true, size + 1;
 	end
-	return tooltip;
+
+	local function GetAllCurrenciesWithHeader()
+		local currencies = {}; -- GetAllMainHeaders();
+		headerOrder = {}; -- Reset header order tracking
+		local finished, nextIndex = false, 1;
+		while not finished do
+			finished, nextIndex = GetNextCurrencyWithHeader(currencies, nextIndex);
+		end
+		return currencies, headerOrder;
+	end
+
+	-- Helper function to check if a header has any currencies (including in children)
+	local function HeaderHasCurrencies(headerEntry)
+		-- Check if this header has currencies
+		if #headerEntry.currencies > 0 then
+			return true;
+		end
+		
+		-- Check if any child headers have currencies
+		for _, childHeader in pairs(headerEntry.children) do
+			if HeaderHasCurrencies(childHeader) then
+				return true;
+			end
+		end
+		
+		return false;
+	end
+
+	-- Helper function to check if a header should be shown based on user settings
+	local function ShouldShowHeader(headerName)
+		local settingKey = "ShowHeader_" .. headerName:gsub(" ", "_");
+		local shouldShow = TitanGetVar(id, settingKey);
+		-- Default to true if setting doesn't exist
+		return shouldShow == nil or shouldShow;
+	end
+
+	-- Recursive function to display nested headers and currencies
+	local function DisplayHeaderRecursive(headerEntry, depth, abbreviateK, abbreviateM, thousandsSeparator, decimalSeparator)
+		-- Don't display headers with no currencies
+		if not HeaderHasCurrencies(headerEntry) then
+			return;
+		end
+		
+		-- If this header is disabled by user, skip it entirely (including its currencies and children)
+		if not ShouldShowHeader(headerEntry.name) then
+			return;
+		end
+
+		local indent = string.rep("  ", depth); -- Indent based on depth
+
+		-- Display header name
+		GameTooltip:AddLine(indent .. headerEntry.name);
+
+		-- Display currencies in this header (sorted by name)
+		if #headerEntry.currencies > 0 then
+			local currencies = {};
+			for _, currency in ipairs(headerEntry.currencies) do
+				tinsert(currencies, currency);
+			end
+			table.sort(currencies, function(a, b) return a.name < b.name end);
+
+			for _, currency in ipairs(currencies) do
+				local quantity, abbr = AbbreviateValue(currency.quantity, abbreviateK, abbreviateM);
+				quantity = TitanUtils_NumToString(quantity, thousandsSeparator, decimalSeparator);
+				GameTooltip:AddDoubleLine(indent .. "  " .. currency.name, quantity .. abbr .. " |T" .. currency.iconFileID .. ":16|t", 1, 1, 1, 1, 1, 1);
+			end
+		end
+
+		-- Recursively display child headers (only those with currencies)
+		for childName, childHeader in pairs(headerEntry.children) do
+			if HeaderHasCurrencies(childHeader) then
+				DisplayHeaderRecursive(childHeader, depth + 1, abbreviateK, abbreviateM, thousandsSeparator, decimalSeparator);
+			end
+		end
+	end
+
+	local function GetAllCurrenciesWithHeaderSorted(self)
+		local headers, orderedHeaderNames = GetAllCurrenciesWithHeader();
+		local abbreviateK, abbreviateM = TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1k"], TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1m"];
+		local thousandsSeparator, decimalSeparator = GetSeparators();
+
+		-- Display top-level headers in their original order
+		local hasDisplayedAnyHeader = false;
+		for _, headerName in ipairs(orderedHeaderNames) do
+			local headerEntry = headers[headerName];
+			if headerEntry then
+				-- Check if this header should be displayed before adding blank lines
+				if HeaderHasCurrencies(headerEntry) and ShouldShowHeader(headerEntry.name) then
+					-- Add blank line before header (except for the first one)
+					if hasDisplayedAnyHeader then
+						GameTooltip_AddBlankLineToTooltip(GameTooltip);
+					end
+					DisplayHeaderRecursive(headerEntry, 0, abbreviateK, abbreviateM, thousandsSeparator, decimalSeparator);
+					hasDisplayedAnyHeader = true;
+				end
+			end
+		end
+	end
+	KrowiTPC.GetAllCurrenciesWithHeaderSorted = GetAllCurrenciesWithHeaderSorted;
+	
+	-- Function to get all available headers (for menu creation)
+	local function GetAllAvailableHeaders()
+		local headers = GetAllCurrenciesWithHeader();
+		local headerList = {};
+		
+		local function AddHeadersRecursive(headerEntry, parentPath)
+			local currentPath = parentPath and (parentPath .. " > " .. headerEntry.name) or headerEntry.name;
+			tinsert(headerList, {
+				name = headerEntry.name,
+				path = currentPath,
+				depth = headerEntry.depth
+			});
+			
+			-- Add child headers
+			for _, childHeader in pairs(headerEntry.children) do
+				AddHeadersRecursive(childHeader, currentPath);
+			end
+		end
+		
+		-- Add all top-level headers and their children
+		for _, headerEntry in pairs(headers) do
+			AddHeadersRecursive(headerEntry);
+		end
+		
+		-- Headers will be returned in their original order
+		
+		return headerList;
+	end
+	
+	KrowiTPC.GetAllAvailableHeaders = GetAllAvailableHeaders;
+end
+
+do
+	local function GetNextCurrency(currencies, startIndex)
+		local size = C_CurrencyInfo.GetCurrencyListSize();
+		for i = startIndex, size do
+			local info = C_CurrencyInfo.GetCurrencyListInfo(i);
+			if info.isHeader then
+				if not info.isHeaderExpanded then
+					C_CurrencyInfo.ExpandCurrencyList(i, true);
+					return false, i + 1;
+				end
+			elseif not (TitanGetVar(id, "CurrencyHideUnused") and info.isTypeUnused) then
+				tinsert(currencies, info);
+			end
+		end
+		return true, size + 1;
+	end
+
+	local function GetAllCurrencies()
+		local currencies, finished, nextIndex = {}, false, 1;
+		while not finished do
+			finished, nextIndex = GetNextCurrency(currencies, nextIndex);
+		end
+		return currencies;
+	end
+
+	local function GetAllCurrenciesSorted()
+		local currencies = GetAllCurrencies();
+		local abbreviateK, abbreviateM = TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1k"], TitanGetVar(id, "CurrencyAbbreviate") == addon.L["1m"];
+		local thousandsSeparator, decimalSeparator = GetSeparators();
+
+		table.sort(currencies, function(a, b) return a.name < b.name end);
+
+		for _, currency in next, currencies do
+			local quantity, abbr = AbbreviateValue(currency.quantity, abbreviateK, abbreviateM);
+			quantity = TitanUtils_NumToString(quantity, thousandsSeparator, decimalSeparator);
+			GameTooltip:AddDoubleLine(currency.name, quantity .. abbr .. " |T" .. currency.iconFileID .. ":16|t", 1, 1, 1, 1, 1, 1);
+		end
+	end
+	KrowiTPC.GetAllCurrenciesSorted = GetAllCurrenciesSorted;
+end
+
+local function GetAllCurrenciesTooltip(self)
+	GameTooltip:SetOwner(self, "ANCHOR_NONE");
+	GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT");
+	GameTooltip:AddLine(addon.Metadata.Title .. " " .. addon.Metadata.Version);
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+
+	if TitanGetVar(id, "CurrencyGroupByHeader") then
+		KrowiTPC.GetAllCurrenciesWithHeaderSorted(self);
+	else
+		KrowiTPC.GetAllCurrenciesSorted(self);
+	end
+
+	GameTooltip:Show();
 end
 
 local function BreakMoney(value)
@@ -125,7 +326,30 @@ end
 local function LoadButton(self)
 	local notes = ""
 		.. "Displays all in-game currencies for your current character\n"
-		.. "in a tooltip, including gold shown on the Titan Panel bar.\n"
+		.. "in a tooltip, including a currency or gold shown on the Titan Panel bar.\n"
+	
+	-- Build savedVariables with dynamic header settings
+	local savedVars = {
+		MoneyLabel = addon.L["Icon"],
+		MoneyAbbreviate = addon.L["None"],
+		MoneyGoldOnly = false,
+		MoneyColored = true,
+		ThousandsSeparator = addon.L["Space"],
+		CurrencyAbbreviate = addon.L["None"],
+		CurrencyGroupByHeader = true,
+		CurrencyHideUnused = true,
+	};
+
+	-- Initialize header visibility settings before creating registry
+	local availableHeaders = KrowiTPC.GetAllAvailableHeaders();
+	for _, headerInfo in ipairs(availableHeaders) do
+		local settingKey = "ShowHeader_" .. headerInfo.name:gsub(" ", "_");
+		-- Only set default if the setting doesn't exist yet
+		if TitanGetVar(id, settingKey) == nil then
+			savedVars[settingKey] = true;
+		end
+	end
+	
 	self.registry = {
 		id = id,
 		category = "Information",
@@ -133,7 +357,7 @@ local function LoadButton(self)
 		menuText = addon.L["Currency by Krowi"],
 		-- menuTextFunction = CreateMenu,
 		tooltipTitle = addon.L["Currency Info"],
-		tooltipTextFunction = GetAllCurrenciesSorted,
+		-- tooltipTextFunction = GetAllCurrenciesTooltip,
 		buttonTextFunction = GetFormattedMoney,
 		icon = "Interface\\AddOns\\TitanGold\\Artwork\\TitanGold",
 		iconWidth = 16,
@@ -144,29 +368,7 @@ local function LoadButton(self)
 			-- ShowRegularText = false,
 			DisplayOnRightSide = true,
 		},
-		savedVariables = {
-			MoneyLabel = addon.L["Icon"],
-			MoneyAbbreviate = addon.L["None"],
-			MoneyGoldOnly = false,
-			MoneyColored = true,
-			ThousandsSeparator = addon.L["Space"],
-			CurrencyAbbreviate = addon.L["None"],
-			-- Initialized = true,
-			-- DisplayGoldPerHour = true,
-			-- SortByName = true,
-			-- ViewAll = true,
-			-- ShowIcon = true,
-			-- ShowLabelText = false,
-			-- DisplayOnRightSide = false,
-			-- MergeServers = false,
-			-- SeparateServers = true,
-			-- AllServers = false,
-			-- IgnoreFaction = false,
-			-- GroupByRealm = false,
-			-- gold = { total = "112233", neg = false },
-			-- ShowSessionInfo = true,
-			-- ShowWarband = true,
-		}
+		savedVariables = savedVars
 	};
 
 	self:RegisterEvent("PLAYER_MONEY");
@@ -187,7 +389,7 @@ local function OnHide(self)
 end
 
 local function CreateCheckbox(menu, text, setKey, resetKeys)
-    menu:CreateCheckbox(
+    local button = menu:CreateCheckbox(
         text,
         function()
             return TitanGetVar(id, setKey);
@@ -244,6 +446,129 @@ local function CreateMenu(self, menu)
 	CreateRadio(currencyAbbreviate, addon.L["1k"], "CurrencyAbbreviate");
 	CreateRadio(currencyAbbreviate, addon.L["1m"], "CurrencyAbbreviate");
 	addon.MenuUtil:AddChildMenu(menu, currencyAbbreviate);
+	CreateCheckbox(menu, addon.L["Currency Group By Header"], "CurrencyGroupByHeader");
+	CreateCheckbox(menu, addon.L["Currency Hide Unused"], "CurrencyHideUnused");
+
+	-- Create header visibility submenu with nested structure
+	local headerVisibility = addon.MenuUtil:CreateButton(menu, addon.L["Header Visibility"] or "Header Visibility");
+	
+	-- Get the structured header data using a simplified approach for menu creation
+	local structuredHeaders = {};
+	local orderedHeaderNames = {};
+	do
+		-- Recreate the header structure locally with order tracking
+		local headerStack = {};
+		local function GetNextCurrencyWithHeaderLocal(currencies, startIndex)
+			local size = C_CurrencyInfo.GetCurrencyListSize();
+			for i = startIndex, size do
+				local info = C_CurrencyInfo.GetCurrencyListInfo(i);
+				if info.isHeader then
+					local depth = info.currencyListDepth;
+					while #headerStack > depth do
+						table.remove(headerStack);
+					end
+					local headerEntry = {
+						name = info.name,
+						depth = depth,
+						children = {},
+						currencies = {}
+					};
+					if depth == 0 then
+						currencies[info.name] = headerEntry;
+						tinsert(orderedHeaderNames, info.name);
+						headerStack = {headerEntry};
+					else
+						if headerStack[depth] then
+							headerStack[depth].children[info.name] = headerEntry;
+						end
+						headerStack[depth + 1] = headerEntry;
+					end
+					if not info.isHeaderExpanded then
+						C_CurrencyInfo.ExpandCurrencyList(i, true);
+						return false, i + 1;
+					end
+				elseif #headerStack > 0 then
+					local currentHeader = headerStack[#headerStack];
+					if currentHeader then
+						tinsert(currentHeader.currencies, info);
+					end
+				end
+			end
+			return true, size + 1;
+		end
+
+		local finished, nextIndex = false, 1;
+		while not finished do
+			finished, nextIndex = GetNextCurrencyWithHeaderLocal(structuredHeaders, nextIndex);
+		end
+	end
+	
+	-- Function to recursively update all child headers
+	local function UpdateChildHeaders(headerEntry, newValue)
+		-- Update all direct children
+		for _, childHeader in pairs(headerEntry.children) do
+			local childSettingKey = "ShowHeader_" .. childHeader.name:gsub(" ", "_");
+			TitanSetVar(id, childSettingKey, newValue);
+			-- Recursively update grandchildren
+			UpdateChildHeaders(childHeader, newValue);
+		end
+	end
+	
+	-- Special checkbox function for parent headers that cascades to children
+	local function CreateParentCheckbox(parentMenu, text, setKey, headerEntry)
+		parentMenu:CreateCheckbox(
+			text,
+			function()
+				return TitanGetVar(id, setKey);
+			end,
+			function()
+				local newValue = not TitanGetVar(id, setKey);
+				TitanSetVar(id, setKey, newValue);
+				-- Update all children with the same value
+				UpdateChildHeaders(headerEntry, newValue);
+				TitanPanelButton_UpdateButton(id);
+			end
+		);
+	end
+	
+	-- Recursive function to create nested menu structure
+	local function CreateHeaderMenu(parentMenu, headerEntry)
+		local settingKey = "ShowHeader_" .. headerEntry.name:gsub(" ", "_");
+		
+		-- Check if this header has children
+		local hasChildren = next(headerEntry.children) ~= nil;
+		
+		if hasChildren then
+			-- Create submenu for headers with children
+			local headerSubmenu = addon.MenuUtil:CreateButton(parentMenu, headerEntry.name);
+			
+			-- Add special checkbox for the header itself that cascades to children
+			CreateParentCheckbox(headerSubmenu, "Show " .. headerEntry.name, settingKey, headerEntry);
+			
+			-- Add separator if there are children
+			addon.MenuUtil:CreateDivider(headerSubmenu);
+			
+			-- Add child headers in their original order
+			for childName, childHeader in pairs(headerEntry.children) do
+				CreateHeaderMenu(headerSubmenu, childHeader);
+			end
+			
+			addon.MenuUtil:AddChildMenu(parentMenu, headerSubmenu);
+		else
+			-- Simple checkbox for headers without children
+			CreateCheckbox(parentMenu, headerEntry.name, settingKey);
+		end
+	end
+	
+	-- Create menus for top-level headers in their original order
+	for _, headerName in ipairs(orderedHeaderNames) do
+		local headerEntry = structuredHeaders[headerName];
+		if headerEntry then
+			CreateHeaderMenu(headerVisibility, headerEntry);
+		end
+	end
+	
+	addon.MenuUtil:AddChildMenu(menu, headerVisibility);
 end
 
 local function OnClick(self, button)
@@ -269,6 +594,10 @@ local function OnClick(self, button)
 	end
 end
 
+local function OnEnter(self)
+	GetAllCurrenciesTooltip(self);
+end
+
 local function Create_Frames()
      local buttonName = "TitanPanel" .. id .. "Button";
      if _G[buttonName] then
@@ -288,7 +617,7 @@ local function Create_Frames()
 
      button:SetScript("OnHide", function(self)
           OnHide(self);
-     end)
+     end);
 
      button:SetScript("OnEvent", function(self, event, ...)
           OnEvent(self, event, ...);
@@ -297,6 +626,10 @@ local function Create_Frames()
      button:SetScript("OnClick", function(self, mouseButton)
           OnClick(self, mouseButton);
           TitanPanelButton_OnClick(self, mouseButton);
+     end);
+
+     button:SetScript("OnEnter", function(self)
+          OnEnter(self);
      end);
 end
 

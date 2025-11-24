@@ -22,3 +22,4 @@ L["Money Colored"] = true
 L["Thousands Separator"] = true
 L["Currency Abbreviate"] = true
 L["None"] = true
+L["Currency Hide Unused"] = true
