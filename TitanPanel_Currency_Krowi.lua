@@ -156,9 +156,9 @@ local function GetFormattedMoney()
 	local currentRealmName = GetRealmName() or "Unknown";
 	local currentFaction = UnitFactionGroup("player") or "Neutral";
 	local characterData = KrowiTPC_SavedData.CharacterData or {};
-	
+
 	if displayMode == addon.L["Character Gold"] then
-		return addon.FormatMoney(GetMoney());
+		return nil, addon.FormatMoney(GetMoney());
 	elseif displayMode == addon.L["Current Faction Total"] then
 		local factionTotal = 0;
 		for _, char in pairs(characterData) do
@@ -166,7 +166,7 @@ local function GetFormattedMoney()
 				factionTotal = factionTotal + (char.money or 0);
 			end
 		end
-		return addon.FormatMoney(factionTotal);
+		return nil, addon.FormatMoney(factionTotal);
 	elseif displayMode == addon.L["Realm Total"] then
 		local realmTotal = 0;
 		for _, char in pairs(characterData) do
@@ -174,19 +174,19 @@ local function GetFormattedMoney()
 				realmTotal = realmTotal + (char.money or 0);
 			end
 		end
-		return addon.FormatMoney(realmTotal);
+		return nil, addon.FormatMoney(realmTotal);
 	elseif displayMode == addon.L["Account Total"] then
 		local accountTotal = 0;
 		for _, char in pairs(characterData) do
 			accountTotal = accountTotal + (char.money or 0);
 		end
 		local warbandMoney = addon.GetWarbandMoney();
-		return addon.FormatMoney(accountTotal + warbandMoney);
+		return nil, addon.FormatMoney(accountTotal + warbandMoney);
 	elseif displayMode == addon.L["Warband Bank"] then
 		local warbandMoney = addon.GetWarbandMoney();
-		return addon.FormatMoney(warbandMoney);
+		return nil, addon.FormatMoney(warbandMoney);
 	else
-		return addon.FormatMoney(GetMoney());
+		return nil, addon.FormatMoney(GetMoney());
 	end
 end
 
@@ -204,7 +204,6 @@ local function LoadButton(self)
 		category = "Information",
 		version = addon.Metadata.Version,
 		menuText = addon.L["Currency by Krowi"],
-		tooltipTitle = addon.L["Currency Info"],
 		buttonTextFunction = GetFormattedMoney,
 		icon = "Interface\\AddOns\\TitanGold\\Artwork\\TitanGold",
 		iconWidth = 16,
@@ -212,6 +211,12 @@ local function LoadButton(self)
 		controlVariables = {
 			ShowIcon = true,
 			DisplayOnRightSide = true,
+			ShowLabelText = true,
+		},
+		savedVariables = {
+			ShowIcon = false,
+			DisplayOnRightSide = false,
+			ShowLabelText = false,
 		}
 	};
 end

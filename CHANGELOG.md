@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 3.1 - 2025-11-28
+### Fixed
+- Titan Panel base options integration for proper plugin configuration
+
 ## 3.0 - 2025-11-27
 ### Added
 - Session gold tracking: Monitor earned and spent gold during play sessions
