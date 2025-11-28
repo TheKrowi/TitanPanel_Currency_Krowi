@@ -9,8 +9,12 @@
 ## RequiredDeps: Titan
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
+## X-Discord-Invite-Link: https://discord.gg/mdBFQJYeQZ
+## X-Discord-Server-Name: Krowi's Addons
 ## X-CurseForge: https://www.curseforge.com/wow/addons/titan-panel-currency-krowis
 ## X-Curse-Project-ID: 1384482
+## X-Wago: https://addons.wago.io/addons/titan-panel-currency-krowis
+## X-Wago-ID: qGZReeGd
 
 Libs\Files.xml
 
