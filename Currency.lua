@@ -88,7 +88,7 @@ end
 
 function currency.UpdateChildHeaders(headerEntry, newValue)
 	for _, childHeader in pairs(headerEntry.children) do
-		local childSettingKey = "ShowHeader_" .. childHeader.name:gsub(" ", "_");
+		local childSettingKey = addon.GetHeaderSettingKey(childHeader.name);
 		addon.Util.WriteNestedKeys(KrowiTPC_Options, {"HeaderSettings", childSettingKey}, newValue);
 		currency.UpdateChildHeaders(childHeader, newValue);
 	end

@@ -64,7 +64,10 @@
         "time",
         "UnitLevel",
         "C_Bank",
-        "Enum"
+        "Enum",
+        "GetClassColor",
+        "IsLeftControlKeyDown",
+        "IsRightControlKeyDown"
     ],
     "Lua.diagnostics.disable": [
         "deprecated",

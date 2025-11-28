@@ -21,10 +21,10 @@ local function HeaderHasCurrencies(headerEntry)
 end
 
 local function ShouldShowHeader(headerName)
-	local settingKey = "ShowHeader_" .. headerName:gsub(" ", "_");
+	local settingKey = addon.GetHeaderSettingKey(headerName);
 	local shouldShow = addon.Util.ReadNestedKeys(KrowiTPC_Options, {"HeaderSettings", settingKey});
-
-	return shouldShow == nil and true or shouldShow;
+	if shouldShow == nil then return true; end
+	return shouldShow;
 end
 
 local function DisplayHeaderRecursive(headerEntry, depth, abbreviateK, abbreviateM, thousandsSeparator, decimalSeparator)
@@ -110,96 +110,133 @@ local function SortCharactersByMoney(charData)
 	return sortedChars;
 end
 
-function tooltip.GetDetailedMoneyTooltip(self)
-	GameTooltip:SetOwner(self, "ANCHOR_NONE");
-	GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT");
-	GameTooltip:AddLine(addon.Metadata.Title .. " - " .. addon.L["Money Details"]);
-	GameTooltip_AddBlankLineToTooltip(GameTooltip);
-
+local function DisplayMoneyContent()
 	local currentPlayerName = UnitName("player") or "Unknown";
 	local currentRealmName = GetRealmName() or "Unknown";
 	local currentKey = currentPlayerName .. "-" .. currentRealmName;
 
-	local characterData = KrowiTPC_Options.CharacterData or {};
+	local characterData = KrowiTPC_SavedData.CharacterData or {};
 	local maxChars = KrowiTPC_Options.MaxCharacters or 20;
 
-	if next(characterData) == nil then
+	if not next(characterData) then
 		GameTooltip:AddLine(addon.L["No character data available yet"], 0.7, 0.7, 0.7);
 		GameTooltip:AddLine(addon.L["Data will be collected as you play"], 0.7, 0.7, 0.7);
-	else
-		local sortedCharacters = SortCharactersByMoney(characterData);
-		local totalMoney = 0;
-		local allianceTotal = 0;
-		local hordeTotal = 0;
-		local warbandMoney = 0;
+		return;
+	end
 
-		-- Get warband money if available (TWW expansion feature)
-		warbandMoney = addon.GetWarbandMoney();
+	local sortedCharacters = SortCharactersByMoney(characterData);
+	local totalMoney = 0;
+	local allianceTotal = 0;
+	local hordeTotal = 0;
+	local warbandMoney = addon.GetWarbandMoney();
 
-		GameTooltip:AddLine(addon.L["Characters:"]);
-
-		local count = 0;
-		for _, char in ipairs(sortedCharacters) do
-			count = count + 1;
-			if count > maxChars then
-				local remaining = #sortedCharacters - maxChars;
-				GameTooltip:AddLine(string.format("+%d %s", remaining, addon.L["more characters"]), 0.7, 0.7, 0.7);
-				break;
-			end
-
-			local money = char.money or 0;
-			totalMoney = totalMoney + money;
-
-			if char.faction == "Alliance" then
-				allianceTotal = allianceTotal + money;
-			elseif char.faction == "Horde" then
-				hordeTotal = hordeTotal + money;
-			end
-
-			local formattedMoney = addon.FormatMoney(money);
-
-			local charName = char.name or "Unknown";
-			local realmName = char.realm or "Unknown";
-			local displayName = charName;
-
-			if realmName ~= currentRealmName then
-				displayName = displayName .. " - " .. realmName;
-			end
-
-			if char.key == currentKey then
-				displayName = displayName .. " |TInterface\\COMMON\\Indicator-Green:14|t";
-			end
-			local classColor = char.classColor or {r = 1, g = 1, b = 1};
-			GameTooltip:AddDoubleLine(displayName, formattedMoney, classColor.r, classColor.g, classColor.b, 1, 1, 1);
+	local sessionProfit = addon.GetSessionProfit();
+	local sessionSpent = addon.GetSessionSpent();
+	
+	if sessionProfit > 0 or sessionSpent > 0 then
+		GameTooltip:AddLine(addon.L["Session:"]);
+		
+		if sessionProfit > 0 then
+			local profitFormatted = addon.FormatMoney(sessionProfit);
+			GameTooltip:AddDoubleLine(addon.L["Earned:"], profitFormatted, 0.5, 1, 0.5, 1, 1, 1);
 		end
-
-		if allianceTotal > 0 and hordeTotal > 0 then
-			GameTooltip_AddBlankLineToTooltip(GameTooltip);
-			GameTooltip:AddLine(addon.L["Faction Totals:"]);
-
-			if allianceTotal > 0 then
-				local allianceFormatted = addon.FormatMoney(allianceTotal);
-				GameTooltip:AddDoubleLine(addon.L["Alliance:"], allianceFormatted, 0, 0.376, 1, 1, 1, 1);
-			end
-
-			if hordeTotal > 0 then
-				local hordeFormatted = addon.FormatMoney(hordeTotal);
-				GameTooltip:AddDoubleLine(addon.L["Horde:"], hordeFormatted, 1, 0.2, 0.2, 1, 1, 1);
-			end
+		
+		if sessionSpent > 0 then
+			local spentFormatted = addon.FormatMoney(sessionSpent);
+			GameTooltip:AddDoubleLine(addon.L["Spent:"], spentFormatted, 1, 0.5, 0.5, 1, 1, 1);
 		end
-
-        GameTooltip_AddBlankLineToTooltip(GameTooltip);
-        local warbandFormatted = addon.FormatMoney(warbandMoney);
-        GameTooltip:AddDoubleLine(addon.L["Warband Bank:"], warbandFormatted, 0.8, 0.6, 1, 1, 1, 1);
-        totalMoney = totalMoney + warbandMoney;
-
+		
 		GameTooltip_AddBlankLineToTooltip(GameTooltip);
-		local totalFormatted = addon.FormatMoney(totalMoney);
-		GameTooltip:AddDoubleLine(addon.L["Total:"], totalFormatted, 1, 1, 0, 1, 1, 1);
+	end
+	
+	GameTooltip:AddLine(addon.L["Characters:"]);
+
+	local count = 0;
+	for _, char in ipairs(sortedCharacters) do
+		count = count + 1;
+		if count > maxChars then
+			local remaining = #sortedCharacters - maxChars;
+			GameTooltip:AddLine(string.format("+%d %s", remaining, addon.L["more characters"]), 0.7, 0.7, 0.7);
+			break;
+		end
+
+		local money = char.money or 0;
+		totalMoney = totalMoney + money;
+
+		if char.faction == "Alliance" then
+			allianceTotal = allianceTotal + money;
+		elseif char.faction == "Horde" then
+			hordeTotal = hordeTotal + money;
+		end
+
+		local formattedMoney = addon.FormatMoney(money);
+
+		local charName = char.name or "Unknown";
+		local realmName = char.realm or "Unknown";
+		local displayName = charName;
+
+		if realmName ~= currentRealmName then
+			displayName = displayName .. " - " .. realmName;
+		end
+
+		if char.key == currentKey then
+			displayName = displayName .. " |TInterface\\COMMON\\Indicator-Green:14|t";
+		end
+
+		local classColor = RAID_CLASS_COLORS[char.className] or {r = 1, g = 1, b = 1};
+		GameTooltip:AddDoubleLine(displayName, formattedMoney, classColor.r, classColor.g, classColor.b, 1, 1, 1);
+	end
+
+	if allianceTotal > 0 and hordeTotal > 0 then
+		GameTooltip_AddBlankLineToTooltip(GameTooltip);
+		GameTooltip:AddLine(addon.L["Faction Totals:"]);
+
+		if allianceTotal > 0 then
+			local allianceFormatted = addon.FormatMoney(allianceTotal);
+			GameTooltip:AddDoubleLine(addon.L["Alliance:"], allianceFormatted, 0, 0.376, 1, 1, 1, 1);
+		end
+
+		if hordeTotal > 0 then
+			local hordeFormatted = addon.FormatMoney(hordeTotal);
+			GameTooltip:AddDoubleLine(addon.L["Horde:"], hordeFormatted, 1, 0.2, 0.2, 1, 1, 1);
+		end
 	end
 
 	GameTooltip_AddBlankLineToTooltip(GameTooltip);
-	GameTooltip:AddLine(addon.L["Release Shift: Show currencies"], 0.5, 0.8, 1);
+	local warbandFormatted = addon.FormatMoney(warbandMoney);
+	GameTooltip:AddDoubleLine(addon.L["Warband Bank:"], warbandFormatted, 0.8, 0.6, 1, 1, 1, 1);
+	totalMoney = totalMoney + warbandMoney;
+
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+	local totalFormatted = addon.FormatMoney(totalMoney);
+	GameTooltip:AddDoubleLine(addon.L["Total:"], totalFormatted, 1, 1, 0, 1, 1, 1);
+end
+
+local function DisplayCurrencyContent()
+	if KrowiTPC_Options.CurrencyGroupByHeader then
+		tooltip.GetAllCurrenciesWithHeaderSorted();
+	else
+		tooltip.GetAllCurrenciesSorted();
+	end
+end
+
+function tooltip.GetDetailedMoneyTooltip(self)
+	GameTooltip:SetOwner(self, "ANCHOR_NONE");
+	GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT");
+	GameTooltip:AddLine(addon.Metadata.Title .. " " .. addon.Metadata.Version);
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+
+	DisplayMoneyContent();
+
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+	local defaultTooltip = KrowiTPC_Options.DefaultTooltip;
+	if defaultTooltip == addon.L["Combined"] then
+		GameTooltip:AddLine(addon.L["Release Shift: Show combined"], 0.5, 0.8, 1);
+	elseif defaultTooltip == addon.L["Money"] then
+		GameTooltip:AddLine(addon.L["Hold Shift: Show currencies"], 0.5, 0.8, 1);
+	else
+		GameTooltip:AddLine(addon.L["Release Shift: Show currencies"], 0.5, 0.8, 1);
+	end
 
 	GameTooltip:Show();
 end
@@ -210,14 +247,38 @@ function tooltip.GetAllCurrenciesTooltip(self)
 	GameTooltip:AddLine(addon.Metadata.Title .. " " .. addon.Metadata.Version);
 	GameTooltip_AddBlankLineToTooltip(GameTooltip);
 
-	if KrowiTPC_Options.CurrencyGroupByHeader then
-		tooltip.GetAllCurrenciesWithHeaderSorted();
-	else
-		tooltip.GetAllCurrenciesSorted();
-	end
+	DisplayCurrencyContent();
 
 	GameTooltip_AddBlankLineToTooltip(GameTooltip);
-	GameTooltip:AddLine(addon.L["Hold Shift: Detailed money info"], 0.5, 0.8, 1);
+	local defaultTooltip = KrowiTPC_Options.DefaultTooltip;
+	if defaultTooltip == addon.L["Combined"] then
+		GameTooltip:AddLine(addon.L["Release Ctrl: Show combined"], 0.5, 0.8, 1);
+	elseif defaultTooltip == addon.L["Money"] then
+		GameTooltip:AddLine(addon.L["Release Shift: Show money"], 0.5, 0.8, 1);
+	else
+		GameTooltip:AddLine(addon.L["Hold Shift: Show money"], 0.5, 0.8, 1);
+	end
+
+	GameTooltip:Show();
+end
+
+function tooltip.GetCombinedTooltip(self)
+	GameTooltip:SetOwner(self, "ANCHOR_NONE");
+	GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT");
+	GameTooltip:AddLine(addon.Metadata.Title .. " " .. addon.Metadata.Version);
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+
+	DisplayMoneyContent();
+
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+	GameTooltip:AddLine("--------------------------------------------------", 0.5, 0.5, 0.5);
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+
+	DisplayCurrencyContent();
+
+	GameTooltip_AddBlankLineToTooltip(GameTooltip);
+	GameTooltip:AddLine(addon.L["Hold Ctrl: Show currencies"], 0.5, 0.8, 1);
+	GameTooltip:AddLine(addon.L["Hold Shift: Show money"], 0.5, 0.8, 1);
 
 	GameTooltip:Show();
 end

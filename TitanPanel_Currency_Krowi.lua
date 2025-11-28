@@ -16,14 +16,65 @@ KrowiTPC_Options = KrowiTPC_Options or {
 	CurrencyGroupByHeader = true,
 	CurrencyHideUnused = true,
 	TrackAllRealms = true,
-	CharacterData = {},
 	MaxCharacters = 20,
 	DefaultTooltip = addon.L["Currency"],
-	ButtonDisplay = addon.L["Character Gold"]
+	ButtonDisplay = addon.L["Character Gold"],
+	TrackSessionGold = true,
+	SessionDuration = 3600,
+	SessionActivityCheckInterval = 600
 };
 
--- Local references for better performance
+KrowiTPC_SavedData = KrowiTPC_SavedData or {
+	CharacterData = {},
+	SessionProfit = 0,
+	SessionSpent = 0,
+	SessionLastUpdate = 0
+};
+
+local activityCheckTimer = nil;
+
+local function CheckSessionExpiration()
+	local currentTime = time();
+	local lastUpdate = KrowiTPC_SavedData.SessionLastUpdate or 0;
+	local duration = KrowiTPC_Options.SessionDuration or 3600;
+	
+	if currentTime - lastUpdate > duration then
+		KrowiTPC_SavedData.SessionProfit = 0;
+		KrowiTPC_SavedData.SessionSpent = 0;
+		KrowiTPC_SavedData.SessionLastUpdate = currentTime;
+		return true;
+	end
+	return false;
+end
+
+local function UpdateSessionActivity()
+	KrowiTPC_SavedData.SessionLastUpdate = time();
+end
+
+function addon.GetSessionProfit()
+	return KrowiTPC_SavedData.SessionProfit or 0;
+end
+
+function addon.GetSessionSpent()
+	return KrowiTPC_SavedData.SessionSpent or 0;
+end
+
+function addon.ResetSessionTracking()
+	KrowiTPC_SavedData.SessionProfit = 0;
+	KrowiTPC_SavedData.SessionSpent = 0;
+	KrowiTPC_SavedData.SessionLastUpdate = time();
+end
+
+function addon.GetSessionDuration()
+	return KrowiTPC_Options.SessionDuration or 3600;
+end
+
+function addon.SetSessionDuration(seconds)
+	KrowiTPC_Options.SessionDuration = math.max(3600, seconds);
+end
+
 local GetMoney = GetMoney;
+local IsShiftKeyDown = IsShiftKeyDown;
 
 function addon.AbbreviateValue(value, abbreviateK, abbreviateM)
 	if abbreviateK and value >= 1000 then
@@ -48,7 +99,10 @@ end
 function addon.GetWarbandMoney()
 	local warbandMoney = 0;
 	if C_Bank and C_Bank.FetchDepositedMoney and Enum and Enum.BankType then
-		warbandMoney = C_Bank.FetchDepositedMoney(Enum.BankType.Account) or 0;
+		local money = C_Bank.FetchDepositedMoney(Enum.BankType.Account);
+		if type(money) == "number" then
+			warbandMoney = money;
+		end
 	end
 	return warbandMoney;
 end
@@ -101,7 +155,7 @@ local function GetFormattedMoney()
 	local displayMode = KrowiTPC_Options.ButtonDisplay;
 	local currentRealmName = GetRealmName() or "Unknown";
 	local currentFaction = UnitFactionGroup("player") or "Neutral";
-	local characterData = KrowiTPC_Options.CharacterData or {};
+	local characterData = KrowiTPC_SavedData.CharacterData or {};
 	
 	if displayMode == addon.L["Character Gold"] then
 		return addon.FormatMoney(GetMoney());
@@ -138,81 +192,108 @@ end
 
 local function LoadButton(self)
 	local notes = ""
-		.. "Displays all in-game currencies for your current character\n"
-		.. "in a tooltip, including a currency or gold shown on the Titan Panel bar.\n"
+		.. "Displays gold and currencies with flexible options:\n"
+		.. "• Multiple display modes: Character, Faction, Realm, Account, or Warband Bank gold\n"
+		.. "• Session tracking: Monitor earned and spent gold with configurable duration\n"
+		.. "• Combined tooltips: View money and currencies together with modifier keys\n"
+		.. "• Character tracking: See gold across all characters with faction/realm totals\n"
+		.. "• Currency management: Group by headers, hide unused, and customize visibility\n"
 
 	self.registry = {
 		id = addon.Metadata.TitanPanelId,
 		category = "Information",
 		version = addon.Metadata.Version,
 		menuText = addon.L["Currency by Krowi"],
-		-- menuTextFunction = CreateMenu,
 		tooltipTitle = addon.L["Currency Info"],
-		-- tooltipTextFunction = GetAllCurrenciesTooltip,
 		buttonTextFunction = GetFormattedMoney,
 		icon = "Interface\\AddOns\\TitanGold\\Artwork\\TitanGold",
 		iconWidth = 16,
 		notes = notes,
 		controlVariables = {
 			ShowIcon = true,
-			-- ShowLabelText = true,
-			-- ShowRegularText = false,
 			DisplayOnRightSide = true,
 		}
 	};
-
-	self:RegisterEvent("PLAYER_MONEY");
-	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 end
 
--- Update character money data
+function addon.GetHeaderSettingKey(headerName)
+	return "ShowHeader_" .. headerName:gsub(" ", "_");
+end
+
 local function UpdateCharacterData()
 	local playerName = UnitName("player") or "Unknown";
 	local realmName = GetRealmName() or "Unknown";
 	local currentMoney = GetMoney();
 	local faction = UnitFactionGroup("player") or "Neutral";
 	local _, className = UnitClass("player");
-	local classColor = RAID_CLASS_COLORS[className] or {r = 1, g = 1, b = 1};
-
 	local characterKey = playerName .. "-" .. realmName;
 
-	-- Get or create character data table
-	local characterData = KrowiTPC_Options.CharacterData or {};
+	local characterData = KrowiTPC_SavedData.CharacterData or {};
 
-	-- Update character information
+	local oldData = characterData[characterKey];
+	local oldMoney = (oldData and oldData.money) or currentMoney;
+	
+	local change = currentMoney - oldMoney;
+	if change ~= 0 and KrowiTPC_Options.TrackSessionGold then
+		if change > 0 then
+			KrowiTPC_SavedData.SessionProfit = (KrowiTPC_SavedData.SessionProfit or 0) + change;
+		elseif change < 0 then
+			KrowiTPC_SavedData.SessionSpent = (KrowiTPC_SavedData.SessionSpent or 0) - change;
+		end
+		UpdateSessionActivity();
+	end
+
 	characterData[characterKey] = {
 		name = playerName,
 		realm = realmName,
 		money = currentMoney,
 		faction = faction,
 		className = className,
-		classColor = classColor,
-		lastUpdate = time(),
-		level = UnitLevel("player") or 1
 	};
 
-	-- Save updated data
-	KrowiTPC_Options.CharacterData = characterData;
+	KrowiTPC_SavedData.CharacterData = characterData;
 end
 
+local sessionDataLoaded = false;
+
 local function OnEvent(self, event, ...)
-	if event == "PLAYER_MONEY" then
+	if event == "PLAYER_MONEY" or event == "SEND_MAIL_MONEY_CHANGED" or 
+	   event == "SEND_MAIL_COD_CHANGED" or event == "PLAYER_TRADE_MONEY" or 
+	   event == "TRADE_MONEY_CHANGED" then
 		UpdateCharacterData();
 		TitanPanelButton_UpdateButton(addon.Metadata.TitanPanelId);
 	elseif event == "PLAYER_ENTERING_WORLD" then
+		if not sessionDataLoaded then
+			CheckSessionExpiration();
+			sessionDataLoaded = true;
+			
+			if not activityCheckTimer then
+				local interval = KrowiTPC_Options.SessionActivityCheckInterval or 600;
+				activityCheckTimer = C_Timer.NewTicker(interval, function()
+					UpdateSessionActivity();
+				end);
+			end
+		end
+		
 		UpdateCharacterData();
 	end
 end
 
 local function OnShow(self)
     self:RegisterEvent("PLAYER_MONEY");
-    self:RegisterEvent("PLAYER_ENTERING_WORLD");
+	self:RegisterEvent("SEND_MAIL_MONEY_CHANGED");
+	self:RegisterEvent("SEND_MAIL_COD_CHANGED");
+	self:RegisterEvent("PLAYER_TRADE_MONEY");
+	self:RegisterEvent("TRADE_MONEY_CHANGED");
 	TitanPanelButton_OnShow(self);
 end
 
 local function OnHide(self)
     self:UnregisterEvent("PLAYER_MONEY");
-    self:UnregisterEvent("PLAYER_ENTERING_WORLD");
+	self:UnregisterEvent("SEND_MAIL_MONEY_CHANGED");
+	self:UnregisterEvent("SEND_MAIL_COD_CHANGED");
+	self:UnregisterEvent("PLAYER_TRADE_MONEY");
+	self:UnregisterEvent("TRADE_MONEY_CHANGED");
 end
 
 local function OnClick(self, button)
@@ -244,8 +325,17 @@ local function ShowTooltip(self, forceType)
 	if not tooltipType then
 		local defaultTooltip = KrowiTPC_Options.DefaultTooltip;
 		local shiftPressed = IsShiftKeyDown();
+		local ctrlPressed = IsLeftControlKeyDown() or IsRightControlKeyDown();
 		
-		if defaultTooltip == addon.L["Money"] then
+		if defaultTooltip == addon.L["Combined"] then
+			if ctrlPressed then
+				tooltipType = addon.L["Currency"];
+			elseif shiftPressed then
+				tooltipType = addon.L["Money"];
+			else
+				tooltipType = addon.L["Combined"];
+			end
+		elseif defaultTooltip == addon.L["Money"] then
 			tooltipType = shiftPressed and addon.L["Currency"] or addon.L["Money"];
 		else
 			tooltipType = shiftPressed and addon.L["Money"] or addon.L["Currency"];
@@ -254,6 +344,8 @@ local function ShowTooltip(self, forceType)
 
 	if tooltipType == addon.L["Money"] then
 		addon.Tooltip.GetDetailedMoneyTooltip(self);
+	elseif tooltipType == addon.L["Combined"] then
+		addon.Tooltip.GetCombinedTooltip(self);
 	else
 		addon.Tooltip.GetAllCurrenciesTooltip(self);
 	end
@@ -263,10 +355,18 @@ local function OnEnter(self)
 	ShowTooltip(self);
 
 	local lastShiftState = IsShiftKeyDown();
-	self:SetScript("OnUpdate", function(frame)
+	local lastCtrlState = IsLeftControlKeyDown() or IsRightControlKeyDown();
+	local throttle = 0;
+	self:SetScript("OnUpdate", function(frame, elapsed)
+		throttle = throttle + elapsed;
+		if throttle < 0.1 then return; end
+		throttle = 0;
+		
 		local currentShiftState = IsShiftKeyDown();
-		if currentShiftState ~= lastShiftState then
+		local currentCtrlState = IsLeftControlKeyDown() or IsRightControlKeyDown();
+		if currentShiftState ~= lastShiftState or currentCtrlState ~= lastCtrlState then
 			lastShiftState = currentShiftState;
+			lastCtrlState = currentCtrlState;
 			ShowTooltip(frame);
 		end
 	end);
@@ -295,6 +395,8 @@ local function Create_Frames()
 	button:SetScript("OnClick", OnClick);
 	button:SetScript("OnEnter", OnEnter);
 	button:SetScript("OnLeave", OnLeave);
+	
+	button:RegisterEvent("PLAYER_ENTERING_WORLD");
 end
 
 Create_Frames();

@@ -2,9 +2,9 @@
 ## Title: |cFF1D92C2Titan Panel [Currency]|r - Krowi's
 ## X-Prefix: KrowiTPC
 ## X-Acronym: KTPC
-## Version: 2.0
+## Version: 3.0
 ## Author: Krowi-Frostmane EU
-## SavedVariables: KrowiTPC_Options
+## SavedVariables: KrowiTPC_Options, KrowiTPC_SavedData
 ## Notes: Displays all in-game currencies for your current character in a tooltip, including gold shown on the Titan Panel bar.
 ## RequiredDeps: Titan
 ## DefaultState: Enabled
