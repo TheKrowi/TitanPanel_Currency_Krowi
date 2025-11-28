@@ -1,66 +1,78 @@
-# TitanPanel Currency - Krowi's
+# TitanPanel Currency – Krowi’s
 
-A comprehensive currency and money tracking addon that integrates seamlessly with Titan Panel, providing detailed financial information across all your characters with advanced session tracking and flexible display options.
+This addon plugs right into Titan Panel to give you a clear view of your gold and currencies. It tracks across all your characters, shows session gains and losses, and lets you decide exactly how much detail you want on your bar or in tooltips.
 
 ## Core Features
 
 ### Multiple Display Modes
-Choose exactly what appears on your Titan Panel bar:
-- **Character Gold** - Current character's money only
-- **Current Faction Total** - All characters from your current faction (Alliance/Horde)
-- **Realm Total** - All characters on your current realm
-- **Account Total** - All characters across all realms + Warband Bank
-- **Warband Bank** - Account-wide shared bank money only
+
+Pick what you want to see on your Titan Panel bar:
+
+- **Character Gold** – Just the money on your current toon  
+- **Current Faction Total** – Totals for all your Alliance or Horde characters  
+- **Realm Total** – Everything on your current realm  
+- **Account Total** – All characters across every realm plus Warband Bank  
+- **Warband Bank** – Only the shared account‑wide bank balance  
 
 ### Advanced Tooltips
-Three distinct tooltip types with smart modifier key switching:
-- **Money Tooltip** - Character list sorted by wealth, faction totals, session tracking
-- **Currency Tooltip** - All currencies with header grouping and sorting
-- **Combined Tooltip** - Both money and currencies in one view
+
+Switch between three tooltip styles with simple key presses:
+
+- **Money Tooltip** – Shows each character’s gold, sorted by wealth, plus faction totals and session info  
+- **Currency Tooltip** – Lists all currencies, grouped and sorted neatly  
+- **Combined Tooltip** – Both money and currencies together in one view  
 
 **Smart Controls:**
-- Hold `Shift` or `Ctrl` to switch between tooltip types
-- Context-aware hints based on your default tooltip setting
-- Throttled input polling for optimal performance
+
+- Hold `Shift` or `Ctrl` to flip between tooltip types  
+- Hints adjust depending on your default tooltip setting  
+- Input is throttled so it runs smoothly without lag  
 
 ### Session Tracking
-Monitor your gold earnings and spending in real-time:
-- **Configurable Duration** - 1 to 48 hours
-- **Persistent Data** - Survives game restarts and reloads
-- **Auto-Extension** - Activity extends session automatically
-- **Real-Time Updates** - Tracks all money changes (mail, trade, loot, repairs, etc.)
-- **Easy Reset** - Toggle session tracking on/off with automatic data clearing
+
+Keep an eye on your gold flow while you play:
+
+- **Flexible Duration** – Track anywhere from 1 to 48 hours  
+- **Data Persists** – Survives reloads and game restarts  
+- **Auto‑Extend** – Keeps going as long as you’re active  
+- **Live Updates** – Records every change (loot, trades, repairs, mail, etc.)  
+- **Quick Reset** – Toggle tracking off to clear the data instantly  
 
 ### Character Management
-Comprehensive cross-character money tracking:
-- **Multi-Realm Support** - Track characters across all realms
-- **Faction Separation** - Alliance and Horde totals
-- **Class Color Coding** - Characters displayed with their class colors
-- **Smart Sorting** - Richest to poorest automatically
-- **Current Character Indicator** - Green indicator shows active character
-- **Warband Integration** - Account-wide shared bank included in totals
+
+See the bigger picture across all your toons:
+
+- **Multi‑Realm Support** – Works across every realm you play on  
+- **Faction Split** – Separate totals for Alliance and Horde  
+- **Class Colors** – Characters shown in their class color for easy spotting  
+- **Smart Sorting** – Richest characters float to the top automatically  
+- **Active Character Highlight** – Green marker shows which one you’re on  
+- **Warband Bank Included** – Shared account balance counted in totals  
 
 ## Customization Options
 
 ### Money Display
-- **Labels** - None, Text (Gold/Silver/Copper), or Icons
-- **Abbreviation** - None, 1k format, or 1m format  
-- **Separators** - Space, Period, or Comma for thousands
-- **Gold Only Mode** - Hide silver and copper amounts
-- **Colored Display** - Enable/disable gold coin colors
-- **Character Limit** - Show 5-30 characters in tooltip
+
+- **Labels** – None, text (Gold/Silver/Copper), or icons  
+- **Abbreviation** – Full numbers, 1k format, or 1m format  
+- **Separators** – Space, period, or comma for thousands  
+- **Gold‑Only Mode** – Hide silver and copper if you prefer  
+- **Colored Display** – Toggle coin colors on or off  
+- **Character Limit** – Show between 5 and 30 characters in the tooltip  
 
 ### Currency Display
-- **Header Grouping** - Organize currencies by expansion/type
-- **Hide Unused** - Show only currencies you actually have
-- **Abbreviation** - None, 1k, or 1m format for large amounts
-- **Header Visibility** - Individual control over which currency categories to show
-- **Alphabetical Sorting** - Clean, organized currency lists
+
+- **Header Grouping** – Organize by expansion or type  
+- **Hide Unused** – Only show currencies you actually own  
+- **Abbreviation** – Full numbers, 1k, or 1m format  
+- **Header Visibility** – Decide which currency groups appear  
+- **Alphabetical Sorting** – Keep lists clean and easy to scan  
 
 ### Interface Options
-- **Default Tooltip** - Choose your primary tooltip type
-- **Realm Tracking** - Include characters from all realms or current only
-- **Session Duration** - 1, 2, 4, 8, 12, 24, or 48 hour sessions
-- **Activity Monitoring** - Automatic session extension based on gameplay
 
-**Pro Tip:** Try the **Combined** tooltip with modifier keys - it gives you instant access to both money and currency information with simple Shift/Ctrl holds!
+- **Default Tooltip** – Pick your go‑to tooltip type  
+- **Realm Tracking** – Include all realms or just the current one  
+- **Session Duration** – Choose from 1, 2, 4, 8, 12, 24, or 48 hours  
+- **Activity Monitoring** – Sessions extend automatically while you’re playing  
+
+**Pro Tip:** Try the **Combined** tooltip with Shift/Ctrl — it’s the fastest way to see both gold and currencies without digging through menus.
